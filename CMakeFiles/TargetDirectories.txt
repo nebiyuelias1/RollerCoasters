@@ -1,0 +1,4 @@
+C:/Users/Nebiyu/Downloads/P3/P3/RollerCoastersTemplate/RollerCoasters/CMakeFiles/RollerCoasters.dir
+C:/Users/Nebiyu/Downloads/P3/P3/RollerCoastersTemplate/RollerCoasters/CMakeFiles/Utilities.dir
+C:/Users/Nebiyu/Downloads/P3/P3/RollerCoastersTemplate/RollerCoasters/CMakeFiles/ALL_BUILD.dir
+C:/Users/Nebiyu/Downloads/P3/P3/RollerCoastersTemplate/RollerCoasters/CMakeFiles/ZERO_CHECK.dir

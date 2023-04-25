@@ -1,0 +1,34 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="16.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\Nebiyu\Downloads\P3\P3\RollerCoastersTemplate\RollerCoasters\src\Utilities\3DUtils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Nebiyu\Downloads\P3\P3\RollerCoastersTemplate\RollerCoasters\src\Utilities\ArcBallCam.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\Nebiyu\Downloads\P3\P3\RollerCoastersTemplate\RollerCoasters\src\Utilities\Pnt3f.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="C:\Users\Nebiyu\Downloads\P3\P3\RollerCoastersTemplate\RollerCoasters\src\Utilities\3DUtils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\Nebiyu\Downloads\P3\P3\RollerCoastersTemplate\RollerCoasters\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="C:\Users\Nebiyu\Downloads\P3\P3\RollerCoastersTemplate\RollerCoasters\src\Utilities\ArcBallCam.H" />
+    <None Include="C:\Users\Nebiyu\Downloads\P3\P3\RollerCoastersTemplate\RollerCoasters\src\Utilities\Pnt3f.H" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{4D7A106A-07C8-3EB7-8DAE-8F51CFAE1037}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{B11159B1-864D-33D2-9B7A-6E8C3698F0D4}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
