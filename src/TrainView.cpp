@@ -26,6 +26,7 @@
 
 #include <iostream>
 #include <Fl/fl.h>
+#include <glm/glm.hpp>
 
 // we will need OpenGL, and OpenGL needs windows.h
 #include <windows.h>
@@ -42,6 +43,32 @@
 #ifdef EXAMPLE_SOLUTION
 #	include "TrainExample/TrainExample.H"
 #endif
+
+// Constants for spline types
+constexpr auto LINEAR_TYPE = 1;
+constexpr auto CARDINAL = 2;
+constexpr auto B_SPLINE = 3;
+
+// Used to divide control points
+constexpr auto DIVIDE_LINE = 1000;
+
+// The pi constant
+constexpr auto M_PI = 3.14159265358979323846;
+
+// These are the basis martices
+glm::mat4 cardinalBasisMatrix = {
+	{ -0.5,  1.5, -1.5,  0.5 },
+	{    1, -2.5,    2, -0.5 },
+	{ -0.5,    0,  0.5,    0 },
+	{    0,    1,    0,    0 },
+};
+
+glm::mat4 bSplineBasisMatrix = {
+	{ -0.1667,    0.5,   -0.5, 0.1667 },
+	{     0.5,     -1,    0.5,      0 },
+	{    -0.5,      0,    0.5,      0 },
+	{  0.1667, 0.6667, 0.1667,      0 }
+};
 
 
 //************************************************************************
@@ -361,14 +388,7 @@ void TrainView::drawStuff(bool doingShadows)
 		}
 	}
 	// draw the track
-	//####################################################################
-	// TODO: 
-	// call your own track drawing code
-	//####################################################################
-
-#ifdef EXAMPLE_SOLUTION
-	drawTrack(this, doingShadows);
-#endif
+	drawTrack(doingShadows);
 
 	// draw the train
 	//####################################################################
@@ -445,4 +465,208 @@ doPick()
 		selectedCube = -1;
 
 	printf("Selected Cube %d\n",selectedCube);
+}
+
+/// <summary>
+/// Draw the track for the train
+/// </summary>
+/// <param name="doingShadows">Indicates whether or not we're using shadows</param>
+void TrainView::drawTrack(bool doingShadows)
+{
+	for (size_t i = 0; i < m_pTrack->points.size(); ++i) {
+		// Get the four control points for this segment
+		Pnt3f p1 = m_pTrack->points[i].pos;
+		Pnt3f p2 = m_pTrack->points[(i + 1) % m_pTrack->points.size()].pos;
+		Pnt3f p3 = m_pTrack->points[(i + 2) % m_pTrack->points.size()].pos;
+		Pnt3f p4 = m_pTrack->points[(i + 3) % m_pTrack->points.size()].pos;
+
+		// Get the four orientation of the control points for this segment
+		Pnt3f o1 = m_pTrack->points[i].orient;
+		Pnt3f o2 = m_pTrack->points[(i + 1) % m_pTrack->points.size()].orient;
+		Pnt3f o3 = m_pTrack->points[(i + 2) % m_pTrack->points.size()].orient;
+		Pnt3f o4 = m_pTrack->points[(i + 3) % m_pTrack->points.size()].orient;
+
+		Pnt3f qt, orient_t;
+
+		// The parameter - could be considered as time
+		float t = 0;
+
+		// The increment used to draw the curves
+		float increment = 1.0f / DIVIDE_LINE;
+
+		switch (tw->splineBrowser->value())
+		{
+			case LINEAR_TYPE:
+				qt = (1 - t) * p1 + t * p2;
+				break;
+			case CARDINAL:
+				qt = p2;
+				break;
+			case B_SPLINE:
+				qt = p1 * (1.0f / 6.0f) + p2 * (4.0f / 6.0f) + p3 * (1.0f / 6.0f);
+				break;
+		}
+
+		for (size_t j = 0; j < DIVIDE_LINE; j++)
+		{
+			// Since qt is going to be recomputed hold the hold value in variable qt0
+			Pnt3f qt0 = qt;
+
+			// The parameter vector T
+			glm::vec4 T(pow(t, 3), pow(t, 2), t, 1);
+
+			Pnt3f tangent;
+
+			t += increment;
+
+			switch (tw->splineBrowser->value())
+			{
+			case LINEAR_TYPE:
+				qt = (1 - t) * p1 + t * p2;
+
+				orient_t = (1 - t) * o1 + t * o2;
+
+				tangent = Pnt3f(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z);
+
+				break;
+			case CARDINAL:
+				glm::vec4 C = cardinalBasisMatrix * T;
+				qt = p1 * C[0] + p2 * C[1] + p3 * C[2] + p4 * C[3];
+
+				orient_t = o1 * C[0] + o2 * C[1] + o3 * C[2] + o4 * C[3];
+
+				T[0] = 3 * pow(t, 2);
+				T[1] = 2 * t;
+				T[2] = 1;
+				T[3] = 0;
+
+				glm::vec4 C1 = cardinalBasisMatrix * T;
+
+				tangent = p1 * C1[0] + p2 * C1[1] + p3 * C1[2] + p4 * C1[3];
+
+				break;
+			case B_SPLINE:
+				C = bSplineBasisMatrix * T;
+				qt = p1 * C[0] + p2 * C[1] + p3 * C[2] + p4 * C[3];
+
+				orient_t = o1 * C[0] + o2 * C[1] + o3 * C[2] + o4 * C[3];
+
+				T[0] = 3 * pow(t, 2);
+				T[1] = 2 * t;
+				T[2] = 1;
+				T[3] = 0;
+				
+				break;
+			}
+
+			orient_t.normalize();
+
+			Pnt3f cross_t = (qt - qt0) * orient_t;
+			cross_t.normalize();
+			cross_t = cross_t * 2.5f;
+
+			tangent.normalize();
+
+			glBegin(GL_LINES);
+			if (!doingShadows)
+				glColor3ub(40, 30, 40);
+			glVertex3f(qt0.x + cross_t.x, qt0.y + cross_t.y, qt0.z + cross_t.z);
+			glVertex3f(qt.x + cross_t.x, qt.y + cross_t.y, qt.z + cross_t.z);
+
+			glVertex3f(qt0.x - cross_t.x, qt0.y - cross_t.y, qt0.z - cross_t.z);
+			glVertex3f(qt.x - cross_t.x, qt.y - cross_t.y, qt.z - cross_t.z);
+			glEnd();
+			glLineWidth(4);
+
+			Pnt3f AC, AB;
+
+			AC = Pnt3f(qt.x - qt0.x, qt.y - qt0.y, qt.z - qt0.z);
+			AB = Pnt3f(1.0f, 0.0f, 0.0f);
+
+			float cos_y = (float)(AC.x * AB.x + AC.y * AB.y + AC.z * AB.z)
+				/ (abs(sqrt(pow(AC.x, 2) + pow(AC.y, 2) + pow(AC.z, 2))) * abs(sqrt(pow(AB.x, 2) + pow(AB.y, 2) + pow(AB.z, 2))));
+
+			float angle_y = acos(cos_y) * 180.0 / M_PI;
+
+			if ((AC.x < 0 && AC.z > 0) || (AC.x > 0 && AC.z > 0))
+				angle_y = -angle_y;
+
+			AB = Pnt3f(0.0f, 1.0f, 0.0f);
+
+			float cos = (float)(orient_t.x * AB.x + orient_t.y * AB.y + orient_t.z * AB.z)
+				/ (abs(sqrt(pow(orient_t.x, 2) + pow(orient_t.y, 2) + pow(orient_t.z, 2))) * abs(sqrt(pow(AB.x, 2) + pow(AB.y, 2) + pow(AB.z, 2))));
+
+			float angle = acos(cos) * 180.0 / M_PI;
+
+			if (j % 100 == 0)
+			{
+				glPushMatrix();
+				glTranslatef(qt.x, qt.y, qt.z);
+				glRotatef(angle_y, 0.0f, 1.0f, 0.0f);
+				glRotatef(angle, 1.0f, 0.0f, 0.0f);
+				
+				//Down
+				glBegin(GL_QUADS);
+				if (!doingShadows)
+					glColor3ub(100, 80, 100);
+				glVertex3f(-1.5, 0, 5);
+				glVertex3f(1.5, 0, 5);
+				glVertex3f(1.5, 0, -5);
+				glVertex3f(-1.5, 0, -5);
+				glEnd();
+
+				//Up
+				glBegin(GL_QUADS);
+				if (!doingShadows)
+					glColor3ub(40, 40, 40);
+				glVertex3f(-1.5, 1, 5);
+				glVertex3f(1.5, 1, 5);
+				glVertex3f(1.5, 1, -5);
+				glVertex3f(-1.5, 1, -5);
+				glEnd();
+
+				//Left
+				glBegin(GL_QUADS);
+				if (!doingShadows)
+					glColor3ub(100, 80, 100);
+				glVertex3f(-1.5, 0, 5);
+				glVertex3f(-1.5, 1, 5);
+				glVertex3f(-1.5, 1, -5);
+				glVertex3f(-1.5, 0, -5);
+				glEnd();
+
+				//Right
+				glBegin(GL_QUADS);
+				if (!doingShadows)
+					glColor3ub(100, 80, 100);
+				glVertex3f(1.5, 0, 5);
+				glVertex3f(1.5, 1, 5);
+				glVertex3f(1.5, 1, -5);
+				glVertex3f(1.5, 0, -5);
+				glEnd();
+
+				//Front
+				glBegin(GL_QUADS);
+				if (!doingShadows)
+					glColor3ub(100, 80, 100);
+				glVertex3f(-1.5, 1, 5);
+				glVertex3f(1.5, 1, 5);
+				glVertex3f(1.5, 0, 5);
+				glVertex3f(-1.5, 0, 5);
+				glEnd();
+
+				//Front
+				glBegin(GL_QUADS);
+				if (!doingShadows)
+					glColor3ub(100, 80, 100);
+				glVertex3f(-1.5, 1, -5);
+				glVertex3f(1.5, 1, -5);
+				glVertex3f(1.5, 0, -5);
+				glVertex3f(-1.5, 0, -5);
+				glEnd();
+
+				glPopMatrix();
+			}	
+		}
+	}
 }
