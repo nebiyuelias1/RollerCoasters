@@ -473,6 +473,8 @@ doPick()
 /// <param name="doingShadows">Indicates whether or not we're using shadows</param>
 void TrainView::drawTrack(bool doingShadows)
 {
+	float distance = 0;
+
 	for (size_t i = 0; i < m_pTrack->points.size(); ++i) {
 		// Get the four control points for this segment
 		Pnt3f p1 = m_pTrack->points[i].pos;
@@ -598,8 +600,12 @@ void TrainView::drawTrack(bool doingShadows)
 
 			float angle = acos(cos) * 180.0 / M_PI;
 
-			if (j % 100 == 0)
+			distance += sqrtf(pow(qt.x - qt0.x, 2) + pow(qt.y - qt0.y, 2) + pow(qt.z - qt0.z, 2));
+
+			if (distance > 10)
 			{
+				distance = 0;
+
 				glPushMatrix();
 				glTranslatef(qt.x, qt.y, qt.z);
 				glRotatef(angle_y, 0.0f, 1.0f, 0.0f);
