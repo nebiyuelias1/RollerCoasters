@@ -213,4 +213,24 @@ advanceTrain(float dir)
 	if (world.trainU > nct) world.trainU -= nct;
 	if (world.trainU < 0) world.trainU += nct;
 #endif
+
+	trainView->t_time += (dir / m_Track.points.size() / (trainView->DIVIDE_LINE / 40)) * speed->value();
+	if (trainView->t_time > 1.0f)
+		trainView->t_time -= 1.0f;
+
+	if (arcLength->value())
+	{
+		trainView->s_time += speed-> value() * (dir / trainView->totalDistance);
+
+		if (trainView->s_time > trainView->totalDistance)
+			trainView->s_time -= trainView->totalDistance;
+
+		trainView->t_time = speed->value() * (float)trainView->s_time * 50 / trainView->totalDistance;
+
+		if (trainView->totalDistance == 0)
+		{
+			trainView->s_time = 0.0f;
+			trainView->t_time = 0.0f;
+		}
+	}
 }

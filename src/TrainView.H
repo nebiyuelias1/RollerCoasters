@@ -79,10 +79,21 @@ class TrainView : public Fl_Gl_Window
 		// Draw the track for the train
 		void drawTrack(bool doingShadows);
 
+		// Draw the train
+		void drawTrain(bool doingShadows);
+
+		void drawWheel(bool doingShadow);
+
 	public:
 		ArcBallCam		arcball;			// keep an ArcBall for the UI
 		int				selectedCube;  // simple - just remember which cube is selected
 
 		TrainWindow*	tw;				// The parent of this display window
 		CTrack*			m_pTrack;		// The track of the entire scene
+
+		static const int DIVIDE_LINE = 1000; // Used to divide control points
+
+		float t_time = 0.0f;
+		float s_time = 0.0f;
+		float totalDistance = 0.0f;
 };

@@ -49,8 +49,6 @@ constexpr auto LINEAR_TYPE = 1;
 constexpr auto CARDINAL = 2;
 constexpr auto B_SPLINE = 3;
 
-// Used to divide control points
-constexpr auto DIVIDE_LINE = 1000;
 
 // The pi constant
 constexpr auto M_PI = 3.14159265358979323846;
@@ -356,6 +354,82 @@ setProjection()
 #ifdef EXAMPLE_SOLUTION
 		trainCamView(this,aspect);
 #endif
+		int side = t_time * m_pTrack->points.size();
+		float t = t_time * m_pTrack->points.size() - side;
+
+		float new_t_time = t_time + (float)1 / m_pTrack->points.size() / (DIVIDE_LINE / 40);
+		if (new_t_time > 1.0f)
+			new_t_time -= 1.0f;
+
+		int new_side = new_t_time * m_pTrack->points.size();
+		float new_t = new_t_time * m_pTrack->points.size() - new_side;
+
+		//pos
+		Pnt3f p1 = m_pTrack->points[side % m_pTrack->points.size()].pos;
+		Pnt3f p2 = m_pTrack->points[(side + 1) % m_pTrack->points.size()].pos;
+		Pnt3f p3 = m_pTrack->points[(side + 2) % m_pTrack->points.size()].pos;
+		Pnt3f p4 = m_pTrack->points[(side + 3) % m_pTrack->points.size()].pos;
+
+		//orient
+		Pnt3f o1 = m_pTrack->points[side % m_pTrack->points.size()].orient;
+		Pnt3f o2 = m_pTrack->points[(side + 1) % m_pTrack->points.size()].orient;
+		Pnt3f o3 = m_pTrack->points[(side + 2) % m_pTrack->points.size()].orient;
+		Pnt3f o4 = m_pTrack->points[(side + 3) % m_pTrack->points.size()].orient;
+
+		//pos
+		Pnt3f new_p1 = m_pTrack->points[new_side % m_pTrack->points.size()].pos;
+		Pnt3f new_p2 = m_pTrack->points[(new_side + 1) % m_pTrack->points.size()].pos;
+		Pnt3f new_p3 = m_pTrack->points[(new_side + 2) % m_pTrack->points.size()].pos;
+		Pnt3f new_p4 = m_pTrack->points[(new_side + 3) % m_pTrack->points.size()].pos;
+
+		//orient
+		Pnt3f new_o1 = m_pTrack->points[new_side % m_pTrack->points.size()].orient;
+		Pnt3f new_o2 = m_pTrack->points[(new_side + 1) % m_pTrack->points.size()].orient;
+		Pnt3f new_o3 = m_pTrack->points[(new_side + 2) % m_pTrack->points.size()].orient;
+		Pnt3f new_o4 = m_pTrack->points[(new_side + 3) % m_pTrack->points.size()].orient;
+
+		Pnt3f qt, orient_t, new_qt;
+
+		// The parameter vector T
+		glm::vec4 T(pow(t, 3), pow(t, 2), t, 1);
+		glm::vec4 new_T(pow(new_t, 3), pow(new_t, 2), new_t, 1);
+
+		switch (tw->splineBrowser->value())
+		{
+		case LINEAR_TYPE:
+			qt = (1 - t) * p1 + t * p2;
+			orient_t = (1 - t) * o1 + t * o2;
+
+			new_qt = (1 - new_t) * new_p1 + new_t * new_p2;
+			break;
+		case CARDINAL:
+			glm::vec4 C = cardinalBasisMatrix * T;
+			qt = p1 * C[0] + p2 * C[1] + p3 * C[2] + p4 * C[3];
+
+			orient_t = o1 * C[0] + o2 * C[1] + o3 * C[2] + o4 * C[3];
+
+			glm::vec4 new_C = cardinalBasisMatrix * new_T;
+			new_qt = new_p1 * new_C[0] + new_p2 * new_C[1] + new_p3 * new_C[2] + new_p4 * new_C[3];
+
+			break;
+		case B_SPLINE:
+			C = bSplineBasisMatrix * T;
+			qt = p1 * C[0] + p2 * C[1] + p3 * C[2] + p4 * C[3];
+
+			orient_t = o1 * C[0] + o2 * C[1] + o3 * C[2] + o4 * C[3];
+
+			new_C = bSplineBasisMatrix * new_T;
+			new_qt = new_p1 * new_C[0] + new_p2 * new_C[1] + new_p3 * new_C[2] + new_p4 * new_C[3];
+
+			break;
+		}
+
+		glMatrixMode(GL_MODELVIEW);
+		glLoadIdentity();
+		gluLookAt(qt.x, qt.y + 3.0f, qt.z, new_qt.x, new_qt.y + 3.0, new_qt.z, 0.0f, 1.0f, 0.0f);
+		glMatrixMode(GL_PROJECTION);
+		glLoadIdentity();
+		gluPerspective(60, aspect, 1.0, 200.0);
 	}
 }
 
@@ -391,15 +465,9 @@ void TrainView::drawStuff(bool doingShadows)
 	drawTrack(doingShadows);
 
 	// draw the train
-	//####################################################################
-	// TODO: 
-	//	call your own train drawing code
-	//####################################################################
-#ifdef EXAMPLE_SOLUTION
 	// don't draw the train if you're looking out the front window
 	if (!tw->trainCam->value())
-		drawTrain(this, doingShadows);
-#endif
+		drawTrain(doingShadows);
 }
 
 // 
@@ -561,6 +629,15 @@ void TrainView::drawTrack(bool doingShadows)
 				break;
 			}
 
+			
+			if (i == 0 && j == 0)
+			{
+				totalDistance = 0.0f;
+			}
+			totalDistance += sqrtf(pow(qt.x - qt0.x, 2) + pow(qt.y - qt0.y, 2) + pow(qt.z - qt0.z, 2));
+			distance += sqrtf(pow(qt.x - qt0.x, 2) + pow(qt.y - qt0.y, 2) + pow(qt.z - qt0.z, 2));
+
+
 			orient_t.normalize();
 
 			Pnt3f cross_t = (qt - qt0) * orient_t;
@@ -599,8 +676,6 @@ void TrainView::drawTrack(bool doingShadows)
 				/ (abs(sqrt(pow(orient_t.x, 2) + pow(orient_t.y, 2) + pow(orient_t.z, 2))) * abs(sqrt(pow(AB.x, 2) + pow(AB.y, 2) + pow(AB.z, 2))));
 
 			float angle = acos(cos) * 180.0 / M_PI;
-
-			distance += sqrtf(pow(qt.x - qt0.x, 2) + pow(qt.y - qt0.y, 2) + pow(qt.z - qt0.z, 2));
 
 			if (distance > 10)
 			{
@@ -675,4 +750,257 @@ void TrainView::drawTrack(bool doingShadows)
 			}	
 		}
 	}
+}
+
+void TrainView::drawTrain(bool doingShadows)
+{
+	int side = t_time * m_pTrack->points.size();
+	float t = t_time * m_pTrack->points.size() - side;
+
+	// The parameter vector T
+	glm::vec4 T(pow(t, 3), pow(t, 2), t, 1);
+
+	//pos
+	Pnt3f p1 = m_pTrack->points[side % m_pTrack->points.size()].pos;
+	Pnt3f p2 = m_pTrack->points[(side + 1) % m_pTrack->points.size()].pos;
+	Pnt3f p3 = m_pTrack->points[(side + 2) % m_pTrack->points.size()].pos;
+	Pnt3f p4 = m_pTrack->points[(side + 3) % m_pTrack->points.size()].pos;
+
+	//orient
+	Pnt3f o1 = m_pTrack->points[side % m_pTrack->points.size()].orient;
+	Pnt3f o2 = m_pTrack->points[(side + 1) % m_pTrack->points.size()].orient;
+	Pnt3f o3 = m_pTrack->points[(side + 2) % m_pTrack->points.size()].orient;
+	Pnt3f o4 = m_pTrack->points[(side + 3) % m_pTrack->points.size()].orient;
+
+	Pnt3f qt, orient_t, tangent;
+
+	switch (tw->splineBrowser->value())
+	{
+		case LINEAR_TYPE:
+			qt = (1 - t) * p1 + t * p2;
+			orient_t = (1 - t) * o1 + t * o2;
+
+			tangent = Pnt3f(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z);
+			break;
+		case CARDINAL:
+			glm::vec4 C = cardinalBasisMatrix * T;
+			qt = p1 * C[0] + p2 * C[1] + p3 * C[2] + p4 * C[3];
+
+			orient_t = o1 * C[0] + o2 * C[1] + o3 * C[2] + o4 * C[3];
+
+			T[0] = 3 * pow(t, 2);
+			T[1] = 2 * t;
+			T[2] = 1;
+			T[3] = 0;
+
+			glm::vec4 C1 = cardinalBasisMatrix * T;
+
+			tangent = p1 * C1[0] + p2 * C1[1] + p3 * C1[2] + p4 * C1[3];
+			break;
+		case B_SPLINE:
+			C = bSplineBasisMatrix * T;
+			qt = p1 * C[0] + p2 * C[1] + p3 * C[2] + p4 * C[3];
+
+			orient_t = o1 * C[0] + o2 * C[1] + o3 * C[2] + o4 * C[3];
+
+			T[0] = 3 * pow(t, 2);
+			T[1] = 2 * t;
+			T[2] = 1;
+			T[3] = 0;
+
+			C1 = bSplineBasisMatrix * T;
+
+			tangent = p1 * C1[0] + p2 * C1[1] + p3 * C1[2] + p4 * C1[3];
+			break;
+	}
+
+	Pnt3f AC, AB;
+
+	AB = Pnt3f(1.0f, 0.0f, 0.0f);
+
+	float cos = 0.0f, cos_y = 0.0f;
+
+	float angle = 0.0f, angle_y = 0.0f;
+
+	cos_y = (float)(tangent.x * AB.x + tangent.y * AB.y + tangent.z * AB.z)
+		/ (abs(sqrt(pow(tangent.x, 2) + pow(tangent.y, 2) + pow(tangent.z, 2))) * abs(sqrt(pow(AB.x, 2) + pow(AB.y, 2) + pow(AB.z, 2))));
+
+	angle_y = acos(cos_y) * 180.0 / M_PI;
+	if ((tangent.x < 0 && tangent.z > 0) || (tangent.x > 0 && tangent.z > 0))
+		angle_y = -angle_y;
+
+	AB = Pnt3f(0.0f, 1.0f, 0.0f);
+
+	cos = (float)(orient_t.x * AB.x + orient_t.y * AB.y + orient_t.z * AB.z)
+		/ (abs(sqrt(pow(orient_t.x, 2) + pow(orient_t.y, 2) + pow(orient_t.z, 2))) * abs(sqrt(pow(AB.x, 2) + pow(AB.y, 2) + pow(AB.z, 2))));
+
+	angle = acos(cos) * 180.0 / M_PI;
+
+	glPushMatrix();
+	glTranslatef(qt.x, qt.y + 2.5f, qt.z);
+	glRotatef(angle_y, 0.0f, 1.0f, 0.0f);
+	glRotatef(angle, 1.0f, 0.0f, 0.0f);
+	
+	//Up
+	glBegin(GL_QUADS);
+	if (!doingShadows)
+		glColor3ub(200, 180, 150);
+	glTexCoord2f(0.0f, 0.0f);
+	glVertex3f(-5, 5, 3);
+	glTexCoord2f(0.0f, 1.0f);
+	glVertex3f(5, 5, 3);
+	glTexCoord2f(1.0f, 1.0f);
+	glVertex3f(5, 5, -3);
+	glTexCoord2f(1.0f, 0.0f);
+	glVertex3f(-5, 5, -3);
+	glEnd();
+
+	//Down
+	glBegin(GL_QUADS);
+	if (!doingShadows)
+		glColor3ub(200, 180, 150);
+	glTexCoord2f(0.0f, 0.0f);
+	glVertex3f(-5, 0, 3);
+	glTexCoord2f(0.0f, 1.0f);
+	glVertex3f(5, 0, 3);
+	glTexCoord2f(1.0f, 1.0f);
+	glVertex3f(5, 0, -3);
+	glTexCoord2f(1.0f, 0.0f);
+	glVertex3f(-5, 0, -3);
+	glEnd();
+
+	//Left
+	glBegin(GL_QUADS);
+	if (!doingShadows)
+		glColor3ub(200, 180, 150);
+	glTexCoord2f(0.0f, 0.0f);
+	glVertex3f(-5, 5, 3);
+	glTexCoord2f(0.0f, 1.0f);
+	glVertex3f(-5, 0, 3);
+	glTexCoord2f(1.0f, 1.0f);
+	glVertex3f(-5, 0, -3);
+	glTexCoord2f(1.0f, 0.0f);
+	glVertex3f(-5, 5, -3);
+	glEnd();
+
+	//Right
+	glBegin(GL_QUADS);
+	if (!doingShadows)
+		glColor3ub(200, 180, 150);
+	glTexCoord2f(0.0f, 0.0f);
+	glVertex3f(5, 5, 3);
+	glTexCoord2f(0.0f, 1.0f);
+	glVertex3f(5, 0, 3);
+	glTexCoord2f(1.0f, 1.0f);
+	glVertex3f(5, 0, -3);
+	glTexCoord2f(1.0f, 0.0f);
+	glVertex3f(5, 5, -3);
+	glEnd();
+
+	//Front
+	glBegin(GL_QUADS);
+	if (!doingShadows)
+		glColor3ub(200, 180, 150);
+	glTexCoord2f(0.0f, 0.0f);
+	glVertex3f(5, 5, 3);
+	glTexCoord2f(0.0f, 1.0f);
+	glVertex3f(5, 0, 3);
+	glTexCoord2f(1.0f, 1.0f);
+	glVertex3f(-5, 0, 3);
+	glTexCoord2f(1.0f, 0.0f);
+	glVertex3f(-5, 5, 3);
+	glEnd();
+
+	//Front
+	glBegin(GL_QUADS);
+	if (!doingShadows)
+		glColor3ub(200, 180, 150);
+	glTexCoord2f(0.0f, 0.0f);
+	glVertex3f(5, 5, -3);
+	glTexCoord2f(0.0f, 1.0f);
+	glVertex3f(5, 0, -3);
+	glTexCoord2f(1.0f, 1.0f);
+	glVertex3f(-5, 0, -3);
+	glTexCoord2f(1.0f, 0.0f);
+	glVertex3f(-5, 5, -3);
+	glEnd();
+
+	glPushMatrix();
+	glTranslatef(5, 0, 3);
+	glRotatef(90, 1.0f, 0.0f, 0.0f);
+	drawWheel(doingShadows);
+	glPopMatrix();
+
+	glPushMatrix();
+	glTranslatef(5, 0, -3);
+	glRotatef(90, 1.0f, 0.0f, 0.0f);
+	drawWheel(doingShadows);
+	glPopMatrix();
+
+	glPushMatrix();
+	glTranslatef(-5, 0, 3);
+	glRotatef(90, 1.0f, 0.0f, 0.0f);
+	drawWheel(doingShadows);
+	glPopMatrix();
+
+	glPushMatrix();
+	glTranslatef(-5, 0, -3);
+	glRotatef(90, 1.0f, 0.0f, 0.0f);
+	drawWheel(doingShadows);
+	glPopMatrix();
+
+	glPopMatrix();
+}
+
+void TrainView::
+drawWheel(bool doingShadow)
+{
+	// Set initial values for variables
+	float x = 0.0f;
+	float y = 0.0f;
+	float z = 0.0f;
+	float r = 1.5f;
+
+	// Draw top half of sphere
+	glBegin(GL_TRIANGLE_FAN);
+	if (!doingShadow) {
+		// Set color to black if not drawing shadow
+		glColor3ub(0, 0, 0);
+	}
+	// Draw center vertex
+	glVertex3f(x, y + 1.0f, z);
+	// Draw vertices around circumference of sphere
+	for (int i = 0; i <= 360; ++i) {
+		glVertex3f(x + r * cos(i * M_PI / 180.0), y + 1.0f, z + r * sin(i * M_PI / 180.0));
+	}
+	glEnd();
+
+	// Draw bottom half of sphere
+	glBegin(GL_TRIANGLE_FAN);
+	if (!doingShadow) {
+		// Set color to black if not drawing shadow
+		glColor3ub(0, 0, 0);
+	}
+	// Draw center vertex
+	glVertex3f(x, y - 1.0f, z);
+	// Draw vertices around circumference of sphere
+	for (int i = 0; i <= 360; ++i) {
+		glVertex3f(x + r * cos(i * M_PI / 180.0), y - 1.0f, z + r * sin(i * M_PI / 180.0));
+	}
+	glEnd();
+
+	// Draw middle section of sphere
+	glBegin(GL_TRIANGLE_STRIP);
+	if (!doingShadow) {
+		// Set color to black if not drawing shadow
+		glColor3ub(0, 0, 0);
+	}
+	// Draw vertices around circumference of sphere
+	for (int i = 0; i <= 360; ++i) {
+		// Draw top vertex of strip
+		glVertex3f(r * cos(i * M_PI / 180.0), 1.0f, r * sin(i * M_PI / 180.0));
+		// Draw bottom vertex of strip
+		glVertex3f(r * cos(i * M_PI / 180.0), -1.0f, r * sin(i * M_PI / 180.0));
+	}
+	glEnd();
 }
